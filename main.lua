@@ -2,211 +2,148 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
--- Nettoyage ancienne UI
+-- Parent GUI
 local parentGui = (gethui and gethui()) or game:GetService("CoreGui")
-local oldGui = parentGui:FindFirstChild("AutoBrainrotHunter")
+local oldGui = parentGui:FindFirstChild("XenhubReplica")
 if oldGui then oldGui:Destroy() end
 
--- Interface Graphique
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoBrainrotHunter"
+screenGui.Name = "XenhubReplica"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentGui
 
+-- Fenêtre Principale (XENHUB PRIVATE)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 330, 0, 320)
-mainFrame.Position = UDim2.new(0.5, -165, 0.5, -160)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.fromRGB(255, 140, 0)
+mainFrame.Size = UDim2.new(0, 450, 0, 320)
+mainFrame.Position = UDim2.new(0.5, -225, 0.5, -160)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+mainFrame.BorderSizePixel = 1
+mainFrame.BorderColor3 = Color3.fromRGB(130, 50, 250)
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.fromRGB(255, 120, 0)
-title.Text = "Steal a Brainrot - Ultra Hunter"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 15
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
+title.Text = "XENHUB REPLICA - Steal a Brainrot"
+title.TextColor3 = Color3.fromRGB(180, 100, 255)
+title.TextSize = 14
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
 
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 35)
-statusLabel.Position = UDim2.new(0, 10, 0, 50)
-statusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-statusLabel.Text = "Status : Pret."
-statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusLabel.TextSize = 11
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextWrapped = true
-statusLabel.Parent = mainFrame
-
-local bestLabel = Instance.new("TextLabel")
-bestLabel.Size = UDim2.new(1, -20, 0, 60)
-bestLabel.Position = UDim2.new(0, 10, 0, 95)
-bestLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-bestLabel.Text = "Meilleur Brainrot : Aucun"
-bestLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-bestLabel.TextSize = 11
-bestLabel.Font = Enum.Font.Gotham
-bestLabel.TextWrapped = true
-bestLabel.Parent = mainFrame
-
-local minValInput = Instance.new("TextBox")
-minValInput.Size = UDim2.new(1, -20, 0, 35)
-minValInput.Position = UDim2.new(0, 10, 0, 165)
-minValInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-minValInput.Text = "1000000"
-minValInput.PlaceholderText = "Valeur minimum recherchee"
-minValInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-minValInput.TextSize = 12
-minValInput.Font = Enum.Font.Gotham
-minValInput.Parent = mainFrame
-
-local autoBtn = Instance.new("TextButton")
-autoBtn.Size = UDim2.new(0.48, 0, 0, 40)
-autoBtn.Position = UDim2.new(0, 10, 0, 210)
-autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-autoBtn.Text = "Lancer Auto-Hop"
-autoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoBtn.TextSize = 12
-autoBtn.Font = Enum.Font.GothamBold
-autoBtn.Parent = mainFrame
-
-local manualScanBtn = Instance.new("TextButton")
-manualScanBtn.Size = UDim2.new(0.48, 0, 0, 40)
-manualScanBtn.Position = UDim2.new(0.52, 0, 0, 210)
-manualScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-manualScanBtn.Text = "Scanner Map"
-manualScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-manualScanBtn.TextSize = 12
-manualScanBtn.Font = Enum.Font.GothamBold
-manualScanBtn.Parent = mainFrame
-
-local isHunting = false
-
--- Convertisseur de texte (ex: "$1.5M/s" -> 1500000)
-local function parseValue(val)
-    if type(val) == "number" then return val end
-    if type(val) == "string" then
-        local cleanStr = val:gsub(",", ""):gsub("%$", "")
-        local num = tonumber(cleanStr:match("[%d%.]+"))
-        if not num then return 0 end
-        if cleanStr:lower():find("k") then return num * 1000 end
-        if cleanStr:lower():find("m") then return num * 1000000 end
-        if cleanStr:lower():find("b") then return num * 1000000000 end
-        return num
-    end
-    return 0
+-- Conteneur des fonctionnalités
+local function createButton(text, pos, parent, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(220, 220, 255)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = parent
+    
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            btn.BackgroundColor3 = Color3.fromRGB(120, 40, 220)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+        end
+        callback(enabled, btn)
+    end)
+    return btn
 end
 
-local function hopToNextServer()
-    statusLabel.Text = "Status : Teleportation..."
-    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-    
+-- Panneau Mouvement
+local movePanel = Instance.new("Frame")
+movePanel.Size = UDim2.new(0.46, 0, 0.8, 0)
+movePanel.Position = UDim2.new(0.03, 0, 0.15, 0)
+movePanel.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+movePanel.Parent = mainFrame
+
+local moveTitle = Instance.new("TextLabel")
+moveTitle.Size = UDim2.new(1, 0, 0, 25)
+moveTitle.Text = "MOVEMENT"
+moveTitle.TextColor3 = Color3.fromRGB(150, 150, 255)
+moveTitle.BackgroundTransparency = 1
+moveTitle.Font = Enum.Font.GothamBold
+moveTitle.Parent = movePanel
+
+-- Speed Toggle
+local speedActive = false
+createButton("WalkSpeed (25)", UDim2.new(0.05, 0, 0.15, 0), movePanel, function(state)
+    speedActive = state
+    humanoid.WalkSpeed = state and 25 or 16
+end)
+
+-- Float / Fly basique
+local floatActive = false
+createButton("Float (Hover)", UDim2.new(0.05, 0, 0.3, 0), movePanel, function(state)
+    floatActive = state
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local bv = hrp:FindFirstChild("FloatBV") or Instance.new("BodyVelocity")
+        bv.Name = "FloatBV"
+        if state then
+            bv.MaxForce = Vector3.new(0, 9e9, 0)
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bv.Parent = hrp
+        else
+            bv:Destroy()
+        end
+    end
+end)
+
+-- Panneau Steal & Server
+local stealPanel = Instance.new("Frame")
+stealPanel.Size = UDim2.new(0.46, 0, 0.8, 0)
+stealPanel.Position = UDim2.new(0.51, 0, 0.15, 0)
+stealPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+stealPanel.Parent = stealPanel or mainFrame
+
+local stealTitle = Instance.new("TextLabel")
+stealTitle.Size = UDim2.new(1, 0, 0, 25)
+stealTitle.Text = "STEAL & SERVER"
+stealTitle.TextColor3 = Color3.fromRGB(150, 150, 255)
+stealTitle.BackgroundTransparency = 1
+stealTitle.Font = Enum.Font.GothamBold
+stealTitle.Parent = stealPanel
+
+-- Server Hop Button
+local hopBtn = Instance.new("TextButton")
+hopBtn.Size = UDim2.new(0.9, 0, 0, 30)
+hopBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+hopBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+hopBtn.Text = "Server Hop"
+hopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+hopBtn.Font = Enum.Font.GothamBold
+hopBtn.Parent = stealPanel
+
+hopBtn.MouseButton1Click:Connect(function()
     local placeId = game.PlaceId
     local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
-    
     local success, result = pcall(function() return game:HttpGet(url) end)
     if success then
         local data = HttpService:JSONDecode(result)
         if data and data.data then
-            local validServers = {}
+            local valid = {}
             for _, s in ipairs(data.data) do
                 if s.id ~= game.JobId and s.playing < s.maxPlayers then
-                    table.insert(validServers, s.id)
+                    table.insert(valid, s.id)
                 end
             end
-            if #validServers > 0 then
-                TeleportService:TeleportToPlaceInstance(placeId, validServers[math.random(1, #validServers)], player)
+            if #valid > 0 then
+                TeleportService:TeleportToPlaceInstance(placeId, valid[math.random(1, #valid)], player)
             end
         end
-    end
-end
-
--- Scan approfondi (Valeurs + Textes d'affichage + Leaderstats)
-local function scanCurrentServer()
-    statusLabel.Text = "Status : Scan en cours..."
-    local targetVal = tonumber(minValInput.Text) or 1000000
-    local maxFound = 0
-    local bestName = "Aucun"
-
-    -- 1. Scan des TextLabels (3D UI au-dessus des Brainrots)
-    for _, gui in ipairs(Workspace:GetDescendants()) do
-        if gui:IsA("TextLabel") or gui:IsA("SurfaceGui") or gui:IsA("BillboardGui") then
-            local text = (gui:IsA("TextLabel") and gui.Text) or ""
-            if text ~= "" and (text:find("%$") or text:lower():find("/s") or text:lower():find("m") or text:lower():find("k")) then
-                local num = parseValue(text)
-                if num > maxFound then
-                    maxFound = num
-                    bestName = gui.Parent.Name
-                end
-            end
-        end
-    end
-
-    -- 2. Scan des objets/ValueBase classiques
-    for _, item in ipairs(Workspace:GetDescendants()) do
-        local valObj = item:FindFirstChild("Price") or item:FindFirstChild("Value") or item:FindFirstChild("Generation") or item:FindFirstChild("Income") or item:FindFirstChild("Cost")
-        local rawVal = valObj and valObj:IsA("ValueBase") and valObj.Value or item:GetAttribute("Price") or item:GetAttribute("Value")
-        if rawVal then
-            local numVal = parseValue(rawVal)
-            if numVal > maxFound then
-                maxFound = numVal
-                bestName = item.Name
-            end
-        end
-    end
-
-    if maxFound > 0 then
-        bestLabel.Text = "Objet/Base : " .. bestName .. "\nValeur estimee : $" .. tostring(maxFound)
-    else
-        bestLabel.Text = "Aucune valeur detectee. Verifie F9 !"
-        print("--- DEBUG DEBUT ---")
-        for _, child in ipairs(Workspace:GetChildren()) do
-            print("Objet Workspace : " .. child.Name .. " (" .. child.ClassName .. ")")
-        end
-        print("--- DEBUG FIN ---")
-    end
-
-    if maxFound >= targetVal and maxFound > 0 then
-        statusLabel.Text = "Status : SERVEUR VALIDE !"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        isHunting = false
-        autoBtn.Text = "Lancer Auto-Hop"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-    else
-        if isHunting then
-            statusLabel.Text = "Status : Valeur trop basse ($" .. maxFound .. "). Hop..."
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            task.wait(1.5)
-            hopToNextServer()
-        else
-            statusLabel.Text = "Status : Scan termine."
-            statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        end
-    end
-end
-
-autoBtn.MouseButton1Click:Connect(function()
-    isHunting = not isHunting
-    if isHunting then
-        autoBtn.Text = "STOP Auto-Hop"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        scanCurrentServer()
-    else
-        autoBtn.Text = "Lancer Auto-Hop"
-        autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        statusLabel.Text = "Status : Arrete."
     end
 end)
-
-manualScanBtn.MouseButton1Click:Connect(scanCurrentServer)
-
-task.wait(2)
-scanCurrentServer()
