@@ -1,171 +1,186 @@
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+
 local player = Players.LocalPlayer
 
--- Nettoyage de l'ancienne interface
-local parentGui = (gethui and gethui()) or game:GetService("CoreGui")
-local oldGui = parentGui:FindFirstChild("FMLYAdminExact")
+-- Parent sécurisé pour Delta (CoreGui)
+local parentGui
+if gethui then
+    parentGui = gethui()
+elseif syn and syn.protect_gui then
+    local sg = Instance.new("ScreenGui")
+    syn.protect_gui(sg)
+    sg.Parent = game:GetService("CoreGui")
+    parentGui = sg
+else
+    parentGui = game:GetService("CoreGui")
+end
+
+-- Nettoyage de l'ancienne UI
+local oldGui = parentGui:FindFirstChild("DeltaServerSearcher")
 if oldGui then oldGui:Destroy() end
 
+local filterMode = "ALL" 
+
+-- ScreenGui Principal
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FMLYAdminExact"
+screenGui.Name = "DeltaServerSearcher"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentGui
 
--- Structure FMLY Admin
+-- Cadre Principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 320, 0, 410)
-mainFrame.Position = UDim2.new(0.03, 0, 0.2, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
-mainFrame.BorderSizePixel = 0
+mainFrame.Size = UDim2.new(0, 320, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.fromRGB(0, 120, 215)
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 10)
-uiCorner.Parent = mainFrame
-
--- Title
+-- Titre
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
-title.Position = UDim2.new(0.05, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "FMLY ADMIN"
-title.TextColor3 = Color3.fromRGB(255, 120, 50)
-title.TextSize = 13
+title.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+title.Text = "Server Searcher (Delta)"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 15
 title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = mainFrame
 
--- Scroll List
-local scrollList = Instance.new("ScrollingFrame")
-scrollList.Size = UDim2.new(1, -16, 0, 350)
-scrollList.Position = UDim2.new(0, 8, 0, 45)
-scrollList.BackgroundTransparency = 1
-scrollList.BorderSizePixel = 0
-scrollList.ScrollBarThickness = 3
-scrollList.ScrollBarImageColor3 = Color3.fromRGB(255, 120, 50)
-scrollList.Parent = mainFrame
+-- Label de Statut
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 25)
+statusLabel.Position = UDim2.new(0, 10, 0, 40)
+statusLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusLabel.Text = "Status: Pret"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 12
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = mainFrame
 
-local uiListLayout = Instance.new("UIListLayout")
-uiListLayout.Parent = scrollList
-uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Padding = UDim.new(0, 5)
+-- Bouton de Filtre
+local filterBtn = Instance.new("TextButton")
+filterBtn.Size = UDim2.new(1, -20, 0, 30)
+filterBtn.Position = UDim2.new(0, 10, 0, 70)
+filterBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+filterBtn.Text = "Filtre : Tous les serveurs"
+filterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+filterBtn.TextSize = 12
+filterBtn.Font = Enum.Font.GothamBold
+filterBtn.Parent = mainFrame
 
--- Fonction de Téléportation Sécurisée (avec objet en main)
-local function safeTeleport(targetPlayer)
-    local myChar = player.Character
-    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    
-    if myHrp and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetHrp = targetPlayer.Character.HumanoidRootPart
-        
-        -- Désactive les collisions du personnage et des objets portés
-        for _, obj in ipairs(myChar:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                obj.CanCollide = false
-            end
-        end
-        
-        -- TP 6 studs au-dessus du joueur
-        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 6, 2)
-        
-        -- Réactive la collision après 1 seconde pour éviter le glitch sous la map
-        task.delay(1, function()
-            if myChar then
-                for _, obj in ipairs(myChar:GetDescendants()) do
-                    if obj:IsA("BasePart") then
-                        obj.CanCollide = true
-                    end
-                end
-            end
-        end)
-    end
+-- Zone de liste des serveurs
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, -20, 1, -150)
+scrollingFrame.Position = UDim2.new(0, 10, 0, 105)
+scrollingFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.Parent = mainFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 5)
+listLayout.Parent = scrollingFrame
+
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- Bouton de Recherche
+local searchBtn = Instance.new("TextButton")
+searchBtn.Size = UDim2.new(1, -20, 0, 35)
+searchBtn.Position = UDim2.new(0, 10, 1, -40)
+searchBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+searchBtn.Text = "Lancer la recherche"
+searchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchBtn.TextSize = 14
+searchBtn.Font = Enum.Font.GothamBold
+searchBtn.Parent = mainFrame
+
+-- Changement du mode de filtre
+filterBtn.MouseButton1Click:Connect(function()
+	if filterMode == "ALL" then
+		filterMode = "LOW"
+		filterBtn.Text = "Filtre : Peu peuples (-40%)"
+		filterBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 180)
+	elseif filterMode == "LOW" then
+		filterMode = "HIGH"
+		filterBtn.Text = "Filtre : Presque pleins (+70%)"
+		filterBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+	else
+		filterMode = "ALL"
+		filterBtn.Text = "Filtre : Tous les serveurs"
+		filterBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+end)
+
+-- Fonction de recherche HTTP
+local function fetchServers()
+	for _, v in ipairs(scrollingFrame:GetChildren()) do
+		if v:IsA("TextButton") then v:Destroy() end
+	end
+	
+	statusLabel.Text = "Status: Recherche..."
+	statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+	
+	local placeId = game.PlaceId
+	local sortOrder = "Asc"
+	if filterMode == "HIGH" then sortOrder = "Desc" end
+	
+	local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
+	
+	local success, result = pcall(function()
+		return game:HttpGet(url)
+	end)
+	
+	if not success then
+		statusLabel.Text = "Status: Erreur HTTP"
+		statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+		return
+	end
+	
+	local data = HttpService:JSONDecode(result)
+	if data and data.data then
+		local count = 0
+		for _, server in ipairs(data.data) do
+			if server.id ~= game.JobId and server.playing < server.maxPlayers then
+				local addServer = false
+				
+				if filterMode == "ALL" then
+					addServer = true
+				elseif filterMode == "LOW" and server.playing <= math.ceil(server.maxPlayers * 0.4) then
+					addServer = true
+				elseif filterMode == "HIGH" and server.playing >= math.floor(server.maxPlayers * 0.7) then
+					addServer = true
+				end
+				
+				if addServer then
+					count = count + 1
+					
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(1, -10, 0, 35)
+					btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+					btn.Text = "Joueurs: " .. server.playing .. "/" .. server.maxPlayers
+					btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+					btn.Font = Enum.Font.Gotham
+					btn.TextSize = 12
+					btn.Parent = scrollingFrame
+					
+					btn.MouseButton1Click:Connect(function()
+						statusLabel.Text = "Status: Teleportation..."
+						TeleportService:TeleportToPlaceInstance(placeId, server.id, player)
+					end)
+				end
+			end
+		end
+		statusLabel.Text = "Status: " .. count .. " serveur(s) trouve(s)"
+		statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+	else
+		statusLabel.Text = "Status: Aucun serveur"
+		statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+	end
 end
 
--- Refresh de la liste des joueurs
-local function refreshPlayerList()
-    for _, child in ipairs(scrollList:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player then
-            local card = Instance.new("Frame")
-            card.Size = UDim2.new(1, -4, 0, 48)
-            card.BackgroundColor3 = Color3.fromRGB(24, 24, 27)
-            card.BorderSizePixel = 0
-            card.Parent = scrollList
-
-            local cardCorner = Instance.new("UICorner")
-            cardCorner.CornerRadius = UDim.new(0, 8)
-            cardCorner.Parent = card
-
-            -- Avatar
-            local avatarImg = Instance.new("ImageLabel")
-            avatarImg.Size = UDim2.new(0, 34, 0, 34)
-            avatarImg.Position = UDim2.new(0, 6, 0.5, -17)
-            avatarImg.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-            avatarImg.Image = Players:GetUserThumbnailAsync(targetPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-            avatarImg.Parent = card
-
-            local imgCorner = Instance.new("UICorner")
-            imgCorner.CornerRadius = UDim.new(1, 0)
-            imgCorner.Parent = avatarImg
-
-            -- Pseudo
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Size = UDim2.new(0.35, 0, 0.45, 0)
-            nameLabel.Position = UDim2.new(0, 45, 0.1, 0)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.Text = targetPlayer.DisplayName
-            nameLabel.TextColor3 = Color3.fromRGB(255, 160, 40)
-            nameLabel.TextSize = 10
-            nameLabel.Font = Enum.Font.GothamBold
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.Parent = card
-
-            -- BOUTON TP MAIN (Spécial Objet en Main)
-            local tpItemBtn = Instance.new("TextButton")
-            tpItemBtn.Size = UDim2.new(0, 65, 0, 28)
-            tpItemBtn.Position = UDim2.new(0.48, 0, 0.2, 0)
-            tpItemBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 180)
-            tpItemBtn.Text = "TP (Hand)"
-            tpItemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            tpItemBtn.TextSize = 9
-            tpItemBtn.Font = Enum.Font.GothamBold
-            tpItemBtn.Parent = card
-
-            local bCorner1 = Instance.new("UICorner")
-            bCorner1.CornerRadius = UDim.new(0, 6)
-            bCorner1.Parent = tpItemBtn
-
-            tpItemBtn.MouseButton1Click:Connect(function()
-                safeTeleport(targetPlayer)
-            end)
-
-            -- BOUTON ALL (Rose FMLY)
-            local allBtn = Instance.new("TextButton")
-            allBtn.Size = UDim2.new(0, 40, 0, 28)
-            allBtn.Position = UDim2.new(0.82, 0, 0.2, 0)
-            allBtn.BackgroundColor3 = Color3.fromRGB(210, 60, 120)
-            allBtn.Text = "ALL"
-            allBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            allBtn.TextSize = 10
-            allBtn.Font = Enum.Font.GothamBold
-            allBtn.Parent = card
-
-            local bCorner2 = Instance.new("UICorner")
-            bCorner2.CornerRadius = UDim.new(0, 6)
-            bCorner2.Parent = allBtn
-
-            allBtn.MouseButton1Click:Connect(function()
-                safeTeleport(targetPlayer)
-            end)
-        end
-    end
-end
-
-Players.PlayerAdded:Connect(refreshPlayerList)
-Players.PlayerRemoving:Connect(refreshPlayerList)
-refreshPlayerList()
+searchBtn.MouseButton1Click:Connect(fetchServers)
