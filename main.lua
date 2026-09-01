@@ -5,23 +5,12 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
--- Nettoyage de l'ancienne UI si elle existe
-local parentGui
-if gethui then
-    parentGui = gethui()
-elseif syn and syn.protect_gui then
-    local sg = Instance.new("ScreenGui")
-    syn.protect_gui(sg)
-    sg.Parent = game:GetService("CoreGui")
-    parentGui = sg
-else
-    parentGui = game:GetService("CoreGui")
-end
-
+-- Nettoyage ancienne UI
+local parentGui = (gethui and gethui()) or game:GetService("CoreGui")
 local oldGui = parentGui:FindFirstChild("AutoBrainrotHunter")
 if oldGui then oldGui:Destroy() end
 
--- Création de l'interface
+-- Interface Graphique
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoBrainrotHunter"
 screenGui.ResetOnSpawn = false
@@ -40,7 +29,7 @@ mainFrame.Parent = screenGui
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundColor3 = Color3.fromRGB(255, 120, 0)
-title.Text = "Steal a Brainrot - Auto Hunter"
+title.Text = "Steal a Brainrot - Ultra Hunter"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 15
 title.Font = Enum.Font.GothamBold
@@ -50,7 +39,7 @@ local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 35)
 statusLabel.Position = UDim2.new(0, 10, 0, 50)
 statusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-statusLabel.Text = "Status : En attente..."
+statusLabel.Text = "Status : Pret."
 statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statusLabel.TextSize = 11
 statusLabel.Font = Enum.Font.Gotham
@@ -73,7 +62,7 @@ minValInput.Size = UDim2.new(1, -20, 0, 35)
 minValInput.Position = UDim2.new(0, 10, 0, 165)
 minValInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 minValInput.Text = "1000000"
-minValInput.PlaceholderText = "Valeur minimum recherchée"
+minValInput.PlaceholderText = "Valeur minimum recherchee"
 minValInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 minValInput.TextSize = 12
 minValInput.Font = Enum.Font.Gotham
@@ -101,23 +90,23 @@ manualScanBtn.Parent = mainFrame
 
 local isHunting = false
 
--- Fonction pour convertir les suffixes K, M, B en chiffres si la valeur est en String
+-- Convertisseur de texte (ex: "$1.5M/s" -> 1500000)
 local function parseValue(val)
     if type(val) == "number" then return val end
     if type(val) == "string" then
-        local num = tonumber(val:match("[%d%.]+"))
+        local cleanStr = val:gsub(",", ""):gsub("%$", "")
+        local num = tonumber(cleanStr:match("[%d%.]+"))
         if not num then return 0 end
-        if val:lower():find("k") then return num * 1000 end
-        if val:lower():find("m") then return num * 1000000 end
-        if val:lower():find("b") then return num * 1000000000 end
+        if cleanStr:lower():find("k") then return num * 1000 end
+        if cleanStr:lower():find("m") then return num * 1000000 end
+        if cleanStr:lower():find("b") then return num * 1000000000 end
         return num
     end
     return 0
 end
 
--- Téléportation vers un serveur aléatoire
 local function hopToNextServer()
-    statusLabel.Text = "Status : Teleportation vers un autre serveur..."
+    statusLabel.Text = "Status : Teleportation..."
     statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
     
     local placeId = game.PlaceId
@@ -133,66 +122,67 @@ local function hopToNextServer()
                     table.insert(validServers, s.id)
                 end
             end
-            
             if #validServers > 0 then
-                local randomServer = validServers[math.random(1, #validServers)]
-                TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
+                TeleportService:TeleportToPlaceInstance(placeId, validServers[math.random(1, #validServers)], player)
             end
         end
     end
 end
 
--- Analyse approfondie de la map
+-- Scan approfondi (Valeurs + Textes d'affichage + Leaderstats)
 local function scanCurrentServer()
-    statusLabel.Text = "Status : Analyse des bases en cours..."
+    statusLabel.Text = "Status : Scan en cours..."
     local targetVal = tonumber(minValInput.Text) or 1000000
     local maxFound = 0
     local bestName = "Aucun"
-    local ownerName = "Inconnu"
 
-    -- Cherche dans tous les sous-dossiers de la map
-    for _, item in ipairs(Workspace:GetDescendants()) do
-        -- Détection via ValueBase ou Attributs
-        local valObj = item:FindFirstChild("Price") or item:FindFirstChild("Value") or item:FindFirstChild("Generation") or item:FindFirstChild("Income") or item:FindFirstChild("Cost") or item:FindFirstChild("Money") or item:FindFirstChild("Cash")
-        
-        local rawVal = nil
-        if valObj then
-            if valObj:IsA("ValueBase") then rawVal = valObj.Value end
-        else
-            -- Vérifie les attributs personnalisés
-            rawVal = item:GetAttribute("Price") or item:GetAttribute("Value") or item:GetAttribute("Generation") or item:GetAttribute("Income")
-        end
-
-        if rawVal then
-            local numVal = parseValue(rawVal)
-            if numVal > maxFound then
-                maxFound = numVal
-                bestName = item.Name
-                
-                -- Essaye d'identifier le propriétaire de la base
-                local model = item:FindFirstAncestorOfClass("Model")
-                if model and model:FindFirstChild("Owner") then
-                    ownerName = tostring(model.Owner.Value)
+    -- 1. Scan des TextLabels (3D UI au-dessus des Brainrots)
+    for _, gui in ipairs(Workspace:GetDescendants()) do
+        if gui:IsA("TextLabel") or gui:IsA("SurfaceGui") or gui:IsA("BillboardGui") then
+            local text = (gui:IsA("TextLabel") and gui.Text) or ""
+            if text ~= "" and (text:find("%$") or text:lower():find("/s") or text:lower():find("m") or text:lower():find("k")) then
+                local num = parseValue(text)
+                if num > maxFound then
+                    maxFound = num
+                    bestName = gui.Parent.Name
                 end
             end
         end
     end
 
+    -- 2. Scan des objets/ValueBase classiques
+    for _, item in ipairs(Workspace:GetDescendants()) do
+        local valObj = item:FindFirstChild("Price") or item:FindFirstChild("Value") or item:FindFirstChild("Generation") or item:FindFirstChild("Income") or item:FindFirstChild("Cost")
+        local rawVal = valObj and valObj:IsA("ValueBase") and valObj.Value or item:GetAttribute("Price") or item:GetAttribute("Value")
+        if rawVal then
+            local numVal = parseValue(rawVal)
+            if numVal > maxFound then
+                maxFound = numVal
+                bestName = item.Name
+            end
+        end
+    end
+
     if maxFound > 0 then
-        bestLabel.Text = "Objet : " .. bestName .. "\nValeur : $" .. tostring(maxFound) .. "\nPropriétaire : " .. ownerName
+        bestLabel.Text = "Objet/Base : " .. bestName .. "\nValeur estimee : $" .. tostring(maxFound)
     else
-        bestLabel.Text = "Aucun Brainrot/Valeur detecte."
+        bestLabel.Text = "Aucune valeur detectee. Verifie F9 !"
+        print("--- DEBUG DEBUT ---")
+        for _, child in ipairs(Workspace:GetChildren()) do
+            print("Objet Workspace : " .. child.Name .. " (" .. child.ClassName .. ")")
+        end
+        print("--- DEBUG FIN ---")
     end
 
     if maxFound >= targetVal and maxFound > 0 then
-        statusLabel.Text = "Status : BON SERVEUR TROUVE !"
+        statusLabel.Text = "Status : SERVEUR VALIDE !"
         statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         isHunting = false
         autoBtn.Text = "Lancer Auto-Hop"
         autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
     else
         if isHunting then
-            statusLabel.Text = "Status : Valeur trop basse. Changement de serveur..."
+            statusLabel.Text = "Status : Valeur trop basse ($" .. maxFound .. "). Hop..."
             statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             task.wait(1.5)
             hopToNextServer()
@@ -203,7 +193,6 @@ local function scanCurrentServer()
     end
 end
 
--- Événements des boutons
 autoBtn.MouseButton1Click:Connect(function()
     isHunting = not isHunting
     if isHunting then
@@ -213,14 +202,11 @@ autoBtn.MouseButton1Click:Connect(function()
     else
         autoBtn.Text = "Lancer Auto-Hop"
         autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-        statusLabel.Text = "Status : Auto-Hop Arrete."
+        statusLabel.Text = "Status : Arrete."
     end
 end)
 
-manualScanBtn.MouseButton1Click:Connect(function()
-    scanCurrentServer()
-end)
+manualScanBtn.MouseButton1Click:Connect(scanCurrentServer)
 
--- Scan automatique 2 secondes après l'arrivée sur la map
 task.wait(2)
 scanCurrentServer()
